@@ -145,27 +145,30 @@ class LSA_VAE(nn.Module):
         self.e3 = nn.Conv2d(ndf*2, ndf*4, 4, 2, 1)
         self.bn3 = nn.BatchNorm2d(ndf*4)
 
-        self.e4 = nn.Conv2d(ndf*4, ndf*8, 4, 2, 1)
-        self.bn4 = nn.BatchNorm2d(ndf*8)
+#        self.e4 = nn.Conv2d(ndf*4, ndf*8, 4, 2, 1)
+#        self.bn4 = nn.BatchNorm2d(ndf*8)
+#
+#        self.e5 = nn.Conv2d(ndf*8, ndf*8, 4, 2, 1)
+#        self.bn5 = nn.BatchNorm2d(ndf*8)
 
-        self.e5 = nn.Conv2d(ndf*8, ndf*8, 4, 2, 1)
-        self.bn5 = nn.BatchNorm2d(ndf*8)
-
-        self.fc1 = nn.Linear(ndf*8*4*4, latent_variable_size)
-        self.fc2 = nn.Linear(ndf*8*4*4, latent_variable_size)
+#        self.fc1 = nn.Linear(ndf*8*4*4, latent_variable_size)
+#        self.fc2 = nn.Linear(ndf*8*4*4, latent_variable_size)
+        self.fc1 = nn.Linear(ndf*4*4, latent_variable_size) #m2?
+        self.fc2 = nn.Linear(ndf*4*4, latent_variable_size)
 
         # decoder
-        self.d1 = nn.Linear(latent_variable_size, ngf*8*2*4*4)
+#        self.d1 = nn.Linear(latent_variable_size, ngf*8*2*4*4)
+        self.d1 = nn.Linear(latent_variable_size, ngf*4*4)
 
-        self.up1 = nn.UpsamplingNearest2d(scale_factor=2)
-        self.pd1 = nn.ReplicationPad2d(1)
-        self.d2 = nn.Conv2d(ngf*8*2, ngf*8, 3, 1)
-        self.bn6 = nn.BatchNorm2d(ngf*8, 1.e-3)
+#        self.up1 = nn.UpsamplingNearest2d(scale_factor=2)
+#        self.pd1 = nn.ReplicationPad2d(1)
+#        self.d2 = nn.Conv2d(ngf*8*2, ngf*8, 3, 1)
+#        self.bn6 = nn.BatchNorm2d(ngf*8, 1.e-3)
 
-        self.up2 = nn.UpsamplingNearest2d(scale_factor=2)
-        self.pd2 = nn.ReplicationPad2d(1)
-        self.d3 = nn.Conv2d(ngf*8, ngf*4, 3, 1)
-        self.bn7 = nn.BatchNorm2d(ngf*4, 1.e-3)
+#        self.up2 = nn.UpsamplingNearest2d(scale_factor=2)
+#        self.pd2 = nn.ReplicationPad2d(1)
+#        self.d3 = nn.Conv2d(ngf*8, ngf*4, 3, 1)
+#        self.bn7 = nn.BatchNorm2d(ngf*4, 1.e-3)
 
         self.up3 = nn.UpsamplingNearest2d(scale_factor=2)
         self.pd3 = nn.ReplicationPad2d(1)
@@ -188,10 +191,12 @@ class LSA_VAE(nn.Module):
     def encode(self, x):
         h1 = self.leakyrelu(self.bn1(self.e1(x)))
         h2 = self.leakyrelu(self.bn2(self.e2(h1)))
-        h3 = self.leakyrelu(self.bn3(self.e3(h2)))
-        h4 = self.leakyrelu(self.bn4(self.e4(h3)))
-        h5 = self.leakyrelu(self.bn5(self.e5(h4)))
-        h5 = h5.view(-1, self.ndf*8*4*4)
+        h5 = self.leakyrelu(self.bn3(self.e3(h2)))
+#        h3 = self.leakyrelu(self.bn3(self.e3(h2)))
+#        h4 = self.leakyrelu(self.bn4(self.e4(h3)))
+#        h5 = self.leakyrelu(self.bn5(self.e5(h4)))
+#        h5 = h5.view(-1, self.ndf*8*4*4)
+        h5 = h5.view(-1, self.ndf*4*4)
 
         return self.fc1(h5), self.fc2(h5)
 
@@ -206,10 +211,12 @@ class LSA_VAE(nn.Module):
 
     def decode(self, z):
         h1 = self.relu(self.d1(z))
-        h1 = h1.view(-1, self.ngf*8*2, 4, 4)
-        h2 = self.leakyrelu(self.bn6(self.d2(self.pd1(self.up1(h1)))))
-        h3 = self.leakyrelu(self.bn7(self.d3(self.pd2(self.up2(h2)))))
-        h4 = self.leakyrelu(self.bn8(self.d4(self.pd3(self.up3(h3)))))
+        h1 = h1.view(-1, self.ngf*4*4, 4, 4)
+#        h1 = h1.view(-1, self.ngf*8*2, 4, 4)
+#        h2 = self.leakyrelu(self.bn6(self.d2(self.pd1(self.up1(h1)))))
+#        h3 = self.leakyrelu(self.bn7(self.d3(self.pd2(self.up2(h2)))))
+#        h4 = self.leakyrelu(self.bn8(self.d4(self.pd3(self.up3(h3)))))
+        h4 = self.leakyrelu(self.bn8(self.d4(self.pd3(self.up3(h1)))))
         h5 = self.leakyrelu(self.bn9(self.d5(self.pd4(self.up4(h4)))))
 
         return self.sigmoid(self.d6(self.pd5(self.up5(h5))))
@@ -313,7 +320,7 @@ if __name__=="__main__":
     
     PLL = PerceptualLoss()
 #    model_e_d = LSA_VAE(8, len(attrs_list))
-    model_e_d = LSA_VAE(nc=3, ngf=128, ndf=128, latent_variable_size=500)
+    model_e_d = LSA_VAE(nc=3, ngf=128, ndf=128, latent_variable_size=256)
     
     
     from data import CelebA
