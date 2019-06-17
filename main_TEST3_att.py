@@ -4,6 +4,8 @@ FROM: https://github.com/mitmedialab/3D-VAE/blob/master/vq_vae/auto_encoder.py
 https://pytorch.org/docs/stable/_modules/torch/distributions/kl.html
 https://github.com/elvisyjlin/AttGAN-PyTorch/blob/master/attgan.py
 """
+global ta
+ta = None
 import numpy as np
 #import logging
 import torch
