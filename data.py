@@ -22,7 +22,6 @@ class Custom(data.Dataset):
         atts = [att_list.index(att) + 1 for att in selected_attrs]
         self.images = np.loadtxt(attr_path, skiprows=2, usecols=[0], dtype=np.str)
         self.labels = np.loadtxt(attr_path, skiprows=2, usecols=atts, dtype=np.int)
-        
         self.tf = transforms.Compose([
             transforms.Resize(image_size),
             transforms.ToTensor(),
