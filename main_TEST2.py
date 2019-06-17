@@ -117,6 +117,7 @@ class LSA_VAE(nn.Module):
 
     def decode(self, z):
 #        z = z.view(-1, self.d, self.f, self.f)
+        print("z", z.size())
         z = z.view(-1, 8, 4, self.att_len)
         h3 = self.decoder(z)
         return F.tanh(h3) # should be like [32, 3, 128, 128]
@@ -124,7 +125,7 @@ class LSA_VAE(nn.Module):
     def forward(self, x):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        print("z.size()", z.size())
+        print("z.size():", z.size())
         return self.decode(z), mu, logvar
 
     def sample(self, size):
