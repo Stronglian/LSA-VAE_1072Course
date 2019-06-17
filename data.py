@@ -66,7 +66,8 @@ class CelebA(data.Dataset):
     def __getitem__(self, index):
         img = self.tf(Image.open(os.path.join(self.data_path, self.images[index])))
 #        print(self.labels[index])
-        att = torch.Tensor((self.labels[index] + 1) / 2).int()
+#        att = torch.tensor((self.labels[index] + 1) // 2)
+        att = torch.Tensor((self.labels[index] + 1) / 2)#.int()
         return img, att
     def __len__(self):
         return self.length
