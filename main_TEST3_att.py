@@ -119,8 +119,11 @@ class LSA_VAE(nn.Module):
 
     def forward(self, x, a=None, mode='enc-dec'):
         if mode == 'enc-dec':
+            global zs, ta
             assert a is not None, 'No given attribute.'
-            return self.decode(self.encode(x), a)
+            ta = a
+            zs = self.encode(x)
+            return self.decode(zs, a), zs
         if mode == 'enc':
             return self.encode(x)
         if mode == 'dec':
