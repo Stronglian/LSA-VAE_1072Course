@@ -22,17 +22,30 @@ from torch.utils.data import DataLoader
 
 class PerceptualLoss():	
     def contentFunc(self):
+#		conv_3_3_layer = 14
         cnn = models.vgg19(pretrained=True).features
         cnn = cnn.cuda()
         model = nn.Sequential()
         model = model.cuda()
+#		for i,layer in enumerate(list(cnn)):
+#			model.add_module(str(i),layer)
+#			if i == conv_3_3_layer:
+#				break
         return model
 		
-    def __init__(self):
+    def __init__(self, loss):
         print("create PerceptualLoss")
+#        self.criterion = loss
+        self.contentFunc = self.contentFunc()
+#    def get_loss(self, fakeIm, realIm):
+#        f_fake = self.contentFunc.forward(fakeIm)
+#        f_real = self.contentFunc.forward(realIm)
+#        f_real_no_grad = f_real.detach()
+#        loss = self.criterion(f_fake, f_real_no_grad)
+#        return loss
     def get_loss(self, fakeIm, realIm):
-        f_fake = self.contentFunc().forward(fakeIm)
-        f_real = self.contentFunc().forward(realIm)
+        f_fake = self.contentFunc.forward(fakeIm)
+        f_real = self.contentFunc.forward(realIm)
         print("FR", f_fake.size(), f_real.size())
         loss = torch.sqrt((f_fake - f_real)**2)
         return loss
@@ -123,11 +136,11 @@ class LSA_VAE(nn.Module):
         print("z.size():", z.size())
         return self.decode(z), mu, logvar
 
-    def sample(self, size):
-        sample = Variable(torch.randn(size, self.d * self.f ** 2), requires_grad=False)
-        if self.cuda():
-            sample = sample.cuda()
-        return self.decode(sample).cpu()
+#    def sample(self, size):
+#        sample = Variable(torch.randn(size, self.d * self.f ** 2), requires_grad=False)
+#        if self.cuda():
+#            sample = sample.cuda()
+#        return self.decode(sample).cpu()
 
     def loss_function(self, x, recon_x, attribute, mu, logvar):
 #        self.mse = F.mse_loss(recon_x, x)
@@ -174,7 +187,7 @@ def train(model_e_d, opt, train_loader):
         ir_loss.backward()
         opt.step()
         
-        print("Train :: ir_loss: %0.5f, attr_real_loss: %0.5f, kl_loss: %0.5f, rec_loss: %0.5f" %(ir_loss, attr_real_loss, kl_real_loss, rec_loss))
+        print("Train :idx:%10d"%(idx))# ir_loss: %0.5f, attr_real_loss: %0.5f, kl_loss: %0.5f, rec_loss: %0.5f" %(np.average(ir_loss), np.average(attr_real_loss), np.average(kl_real_loss), np.average(rec_loss)))
         
         
     
@@ -212,7 +225,7 @@ if __name__=="__main__":
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    PLL = PerceptualLoss()
+    PLL = PerceptualLoss(nn.MSELoss())
     model_e_d = LSA_VAE(8, len(attrs_list))
     
     
