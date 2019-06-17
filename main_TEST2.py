@@ -33,6 +33,7 @@ class PerceptualLoss():
     def get_loss(self, fakeIm, realIm):
         f_fake = self.contentFunc().forward(fakeIm)
         f_real = self.contentFunc().forward(realIm)
+        print("FR", f_fake.size(), f_real.size())
         loss = torch.sqrt((f_fake - f_real)**2)
         return loss
 
@@ -110,15 +111,15 @@ class LSA_VAE(nn.Module):
         if self.training:
             std = logvar.mul(0.5).exp_()
             eps = Variable(std.new(std.size()).normal_())
-            return eps.mul(std).add_(mu)
+            return eps.mul(std).add_(mu) 
         else:
             return mu
 
     def decode(self, z):
 #        z = z.view(-1, self.d, self.f, self.f)
-        z = z.view(-1, 8, 4, self.att_len)##########################################################
+        z = z.view(-1, 8, 4, self.att_len)
         h3 = self.decoder(z)
-        return F.tanh(h3)
+        return F.tanh(h3) # should be like [32, 3, 128, 128]
 
     def forward(self, x):
         mu, logvar = self.encode(x)
