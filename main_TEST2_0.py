@@ -34,7 +34,7 @@ class PerceptualLoss():
         return model
 		
     def __init__(self, loss):
-        print("create PerceptualLoss")
+#        print("create PerceptualLoss")
         self.criterion = loss
         self.contentFunc = self.contentFunc()
     def get_loss(self, fakeIm, realIm):
@@ -108,11 +108,11 @@ class LSA_VAE(nn.Module):
         
     def encode(self, x):
         h1 = self.encoder(x)
-        print("h1.size():", h1.size())
+#        print("h1.size():", h1.size())
         self.tmp_h1_size = h1.size()
         h1 = h1.view(-1, self.d * self.f ** 2) #reshape
 #        h1 = h1.view(h1.size(0), -1) #reshape
-        print("h1.size():", h1.size())
+#        print("h1.size():", h1.size())
         return self.fc11(h1), self.fc12(h1) #mu, logvar
 
     def reparameterize(self, mu, logvar):
@@ -124,7 +124,7 @@ class LSA_VAE(nn.Module):
             return mu
 
     def decode(self, z):
-        print("z", z.size())
+#        print("z", z.size())
         z = z.view(-1, self.d, self.f, self.f)
 #        z = z.view(-1, 8, 4, self.att_len)
         h3 = self.decoder(z)
@@ -133,7 +133,7 @@ class LSA_VAE(nn.Module):
     def forward(self, x):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
-        print("z.size():", z.size())
+#        print("z.size():", z.size())
         return self.decode(z), mu, logvar
 
 #    def sample(self, size):
@@ -150,23 +150,48 @@ class LSA_VAE(nn.Module):
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
         # https://arxiv.org/abs/1312.6114
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-        self.kl_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
+        self.kl_real_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
 #        self.kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-        print("size:", logvar.size(), attribute.size())
+#        print("size:", logvar.size(), attribute.size())
         self.attr_real_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], attribute)
         # Normalise by same number of elements as in reconstruction
 #        self.kl_loss /= batch_size * 3 * 1024
 
         # return mse
-        return self.attr_real_loss, self.kl_loss
+        return self.attr_real_loss, self.kl_real_loss
     
 
-    def latest_losses(self):
-        return {'attr_real_loss': self.attr_real_loss, 'kl_loss': self.kl_loss}
+#    def latest_losses(self):
+#        return {'attr_real_loss': self.attr_real_loss, 'kl_real_loss': self.kl_real_loss}
+    
+    
+#    def train_Enc(self):
+#        """ 要訓練的 phi、psi 在哪?"""
+##        for p in self.encoder.parameters():
+##            p.requires_grad = True
+#        
+#        attr_real_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], attribute)
+#        kl_real_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
+#        kl_fake_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
+#        
+#        enc_loss = attr_real_loss + kl_real_loss + np.max(0, hyper_m - kl_fake_loss)
+#        
+#        return enc_loss
+#    
+#    def train_Dec(self):
+#        """ 要訓練的 sita 在哪?"""
+#        
+#        attr_fake_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], a_ti)
+#        kl_fake_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
+#        
+#        dec_loss = kl_fake_loss + attr_fake_loss
+#        
+#        return dec_loss
     
     
 def train(model_e_d, opt, train_loader):
     model_e_d.train()
+#    lowestLOSS = 1
     for idx, (img, attr) in enumerate(train_loader):
         
 #        img = img.cuda() if torch.cuda.is_available() else img
@@ -177,17 +202,23 @@ def train(model_e_d, opt, train_loader):
         
         opt.zero_grad()
         
+        # Inference and reconstruction training
+        
         recon_x, mu, logvar = model_e_d(img)
         
         attr_real_loss, kl_real_loss = model_e_d.loss_function(img, recon_x, attr, mu, logvar)
         rec_loss = PLL.get_loss(recon_x, img)
         
-        ir_loss = attr_real_loss - kl_real_loss + rec_loss
+        ir_loss = hyper_alpha*attr_real_loss - hyper_beta*kl_real_loss + hyper_gamma*rec_loss
         
         ir_loss.backward()
         opt.step()
         
-        print("Train :idx:%10d"%(idx))# ir_loss: %0.5f, attr_real_loss: %0.5f, kl_loss: %0.5f, rec_loss: %0.5f" %(np.average(ir_loss), np.average(attr_real_loss), np.average(kl_real_loss), np.average(rec_loss)))
+        print("Train :idx:%10d"%(idx))
+        print("ir_loss:", ir_loss.item(),      ", attr_real_loss:", attr_real_loss.item(), \
+              ", kl_loss:", kl_real_loss.item(), ", rec_loss:", rec_loss.item())
+        
+        # Adversarial training
         
         
     
@@ -204,7 +235,7 @@ if __name__=="__main__":
     data_path = "data/img_align_celeba"
     img_size=128
     num_workers = 0
-    attrs__all = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", 
+    attrs_all = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", 
                   "Bags_Under_Eyes", "Bald", "Bangs", "Big_Lips", "Big_Nose", 
                   "Black_Hair", "Blond_Hair", "Blurry", "Brown_Hair", 
                   "Bushy_Eyebrows", "Chubby", "Double_Chin", "Eyeglasses", 
@@ -215,13 +246,18 @@ if __name__=="__main__":
                   "Straight_Hair", "Wavy_Hair", "Wearing_Earrings", 
                   "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", 
                   "Wearing_Necktie", "Young"] # 40
-    attrs_default = [
-    'Bald', 'Bangs', 'Black_Hair', 'Blond_Hair', 'Brown_Hair', 'Bushy_Eyebrows',
-    'Eyeglasses', 'Male', 'Mouth_Slightly_Open', 'Mustache', 'No_Beard', 'Pale_Skin', 'Young'
-]
+    attrs_default = ['Bald', 'Bangs', 'Black_Hair', 'Blond_Hair', 'Brown_Hair',
+                     'Bushy_Eyebrows', 'Eyeglasses', 'Male', 
+                     'Mouth_Slightly_Open', 'Mustache', 'No_Beard', 
+                     'Pale_Skin', 'Young']
     attrs_list = attrs_default.copy()
     batch_size = 32
     n_samples = 16
+    
+    hyper_alpha = 1
+    hyper_beta = 1
+    hyper_gamma = 1
+    hyper_m = 1
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
@@ -232,6 +268,8 @@ if __name__=="__main__":
     from data import CelebA
     train_dataset = CelebA(data_path, attr_path, img_size, 'train', attrs_list)
     valid_dataset = CelebA(data_path, attr_path, img_size, 'valid', attrs_list)
+    
+    
     train_dataloader = DataLoader(
         train_dataset, batch_size=batch_size, num_workers=num_workers,
         shuffle=True, drop_last=True
