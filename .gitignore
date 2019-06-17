@@ -3,3 +3,4 @@ REFER/*
 data/img_align_celeba/*
 data/list_attr_celeba.txt
 data/img_align_celeba.zip
+__pycache__/data.cpython-36.pyc
