@@ -4,8 +4,6 @@ FROM: https://github.com/mitmedialab/3D-VAE/blob/master/vq_vae/auto_encoder.py
 https://pytorch.org/docs/stable/_modules/torch/distributions/kl.html
 https://github.com/elvisyjlin/AttGAN-PyTorch/blob/master/attgan.py
 """
-global ta
-ta = None
 import numpy as np
 #import logging
 import torch
@@ -25,6 +23,8 @@ from torch.utils.data import DataLoader
 #from .nearest_embed import NearestEmbed
 
 class PerceptualLoss():	
+    def __init__(self):
+        print("create PerceptualLoss")
     def contentFunc(self):
         cnn = models.vgg19(pretrained=True).features
         cnn = cnn.cuda()
@@ -32,8 +32,6 @@ class PerceptualLoss():
         model = model.cuda()
         return model
 		
-    def __init__(self):
-        print("create PerceptualLoss")
     def get_loss(self, fakeIm, realIm):
         f_fake = self.contentFunc.forward(fakeIm)
         f_real = self.contentFunc.forward(realIm)
@@ -101,7 +99,7 @@ class LSA_VAE(nn.Module):
         for layer in self.enc_layers:
             z = layer(z)
             zs.append(z)
-        return zs
+        return zs, z #z, a
     
     def decode(self, zs, a):
         a_tile = a.view(a.size(0), -1, 1, 1).repeat(1, 1, self.f_size, self.f_size)
@@ -119,11 +117,9 @@ class LSA_VAE(nn.Module):
 
     def forward(self, x, a=None, mode='enc-dec'):
         if mode == 'enc-dec':
-            global zs, ta
             assert a is not None, 'No given attribute.'
-            ta = a
-            zs = self.encode(x)
-            return self.decode(zs, a), zs
+            zs, a_ti = self.encode(x)
+            return self.decode(zs, a), zs, a_ti
         if mode == 'enc':
             return self.encode(x)
         if mode == 'dec':
