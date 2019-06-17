@@ -31,8 +31,8 @@ class PerceptualLoss():
     def __init__(self):
         print("create PerceptualLoss")
     def get_loss(self, fakeIm, realIm):
-        f_fake = self.contentFunc.forward(fakeIm)
-        f_real = self.contentFunc.forward(realIm)
+        f_fake = self.contentFunc().forward(fakeIm)
+        f_real = self.contentFunc().forward(realIm)
         loss = torch.sqrt((f_fake - f_real)**2)
         return loss
 
@@ -104,7 +104,7 @@ class LSA_VAE(nn.Module):
 #        h1 = h1.view(-1, self.d * self.f ** 2) #reshape
         h1 = h1.view(h1.size(0), -1) #reshape
         print("h1.size():", h1.size())
-        return self.fc11(h1), self.fc12(h1)
+        return self.fc11(h1), self.fc12(h1) #mu, logvar
 
     def reparameterize(self, mu, logvar):
         if self.training:
@@ -143,7 +143,7 @@ class LSA_VAE(nn.Module):
         self.kl_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
 #        self.kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         print("size:", logvar.size(), attribute.size())
-        self.attr_real_loss = F.cross_entropy(logvar, attribute)
+        self.attr_real_loss = F.binary_cross_entropy_with_logits(logvar, attribute)
         # Normalise by same number of elements as in reconstruction
 #        self.kl_loss /= batch_size * 3 * 1024
 
@@ -161,6 +161,9 @@ def train(model_e_d, opt, train_loader):
         
 #        img = img.cuda() if torch.cuda.is_available() else img
 #        attr = attr.cuda() if torch.cuda.is_available() else attr
+        
+#        img = img.float()#.to(device)
+        attr = attr.float()#.to(device)
         
         opt.zero_grad()
         
