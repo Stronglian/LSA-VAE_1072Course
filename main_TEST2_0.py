@@ -35,20 +35,20 @@ class PerceptualLoss():
 		
     def __init__(self, loss):
         print("create PerceptualLoss")
-#        self.criterion = loss
+        self.criterion = loss
         self.contentFunc = self.contentFunc()
-#    def get_loss(self, fakeIm, realIm):
-#        f_fake = self.contentFunc.forward(fakeIm)
-#        f_real = self.contentFunc.forward(realIm)
-#        f_real_no_grad = f_real.detach()
-#        loss = self.criterion(f_fake, f_real_no_grad)
-#        return loss
     def get_loss(self, fakeIm, realIm):
         f_fake = self.contentFunc.forward(fakeIm)
         f_real = self.contentFunc.forward(realIm)
-        print("FR", f_fake.size(), f_real.size())
-        loss = torch.sqrt((f_fake - f_real)**2)
+        f_real_no_grad = f_real.detach()
+        loss = self.criterion(f_fake, f_real_no_grad)
         return loss
+#    def get_loss(self, fakeIm, realIm):
+#        f_fake = self.contentFunc.forward(fakeIm)
+#        f_real = self.contentFunc.forward(realIm)
+#        print("FR", f_fake.size(), f_real.size())
+#        loss = torch.sqrt((f_fake - f_real)**2)
+#        return loss
 
 class ResBlock(nn.Module):
     def __init__(self, in_channels, channels, bn=False):
