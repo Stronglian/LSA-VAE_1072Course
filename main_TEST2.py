@@ -53,7 +53,7 @@ class ResBlock(nn.Module):
         return x + self.convs(x)
 
 class LSA_VAE(nn.Module):
-    def __init__(self, d, kl_coef=0.1, **kwargs):
+    def __init__(self, d, att_len, kl_coef=0.1, **kwargs):
         super(LSA_VAE, self).__init__()
 
         self.encoder = nn.Sequential(
@@ -69,6 +69,8 @@ class LSA_VAE(nn.Module):
             nn.BatchNorm2d(d),
             
             ResBlock(d, d, bn=True),
+            
+#            nn.linear(self.f**2 * self.d, )
         )
         self.decoder = nn.Sequential(
             ResBlock(d, d, bn=True),
@@ -81,18 +83,26 @@ class LSA_VAE(nn.Module):
             nn.ReLU(inplace=True),
             nn.ConvTranspose2d(d // 2, 3, kernel_size=4, stride=2, padding=1, bias=False),
         )
-        self.f = 8
+        
+        
+        self.f = 32
         self.d = d
-        self.fc11 = nn.Linear(d * self.f ** 2, d * self.f ** 2)
-        self.fc12 = nn.Linear(d * self.f ** 2, d * self.f ** 2)
+#        self.fc11 = nn.Linear(d * self.f ** 2, d * self.f ** 2)
+        self.fc11 = nn.Linear(self.f ** 2 * self.d, att_len)
+#        self.fc12 = nn.Linear(d * self.f ** 2, d * self.f ** 2)
+        self.fc12 = nn.Linear(self.f ** 2 * self.d, att_len)
         self.kl_coef = kl_coef
         self.kl_loss = 0
         self.mse = 0
         
+        
     def encode(self, x):
         h1 = self.encoder(x)
-#        h1 = h1.view(-1, self.d * self.f ** 2) #
+        print("h1.size():", h1.size())
+        self.tmp_h1_size = h1.size()
+#        h1 = h1.view(-1, self.d * self.f ** 2) #reshape
         h1 = h1.view(h1.size(0), -1) #reshape
+        print("h1.size():", h1.size())
         return self.fc11(h1), self.fc12(h1)
 
     def reparameterize(self, mu, logvar):
@@ -104,7 +114,8 @@ class LSA_VAE(nn.Module):
             return mu
 
     def decode(self, z):
-        z = z.view(-1, self.d, self.f, self.f)
+#        z = z.view(-1, self.d, self.f, self.f)
+        z = z.view(self.tmp_h1_size[0], self.tmp_h1_size[1], self.tmp_h1_size[2], -1)
         h3 = self.decoder(z)
         return F.tanh(h3)
 
@@ -129,7 +140,7 @@ class LSA_VAE(nn.Module):
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
         self.kl_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
 #        self.kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-        print(logvar.size(), attribute.size())
+        print("size:", logvar.size(), attribute.size())
         self.attr_real_loss = F.cross_entropy(logvar, attribute)
         # Normalise by same number of elements as in reconstruction
 #        self.kl_loss /= batch_size * 3 * 1024
@@ -145,7 +156,6 @@ class LSA_VAE(nn.Module):
 def train(model_e_d, opt, train_loader):
     model_e_d.train()
     for idx, (img, attr) in enumerate(train_loader):
-        
         
         opt.zero_grad()
         
@@ -176,6 +186,17 @@ if __name__=="__main__":
     data_path = "data/img_align_celeba"
     img_size=128
     num_workers = 0
+    attrs__all = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", 
+                  "Bags_Under_Eyes", "Bald", "Bangs", "Big_Lips", "Big_Nose", 
+                  "Black_Hair", "Blond_Hair", "Blurry", "Brown_Hair", 
+                  "Bushy_Eyebrows", "Chubby", "Double_Chin", "Eyeglasses", 
+                  "Goatee", "Gray_Hair", "Heavy_Makeup", "High_Cheekbones", 
+                  "Male", "Mouth_Slightly_Open", "Mustache", "Narrow_Eyes", 
+                  "No_Beard", "Oval_Face", "Pale_Skin", "Pointy_Nose", 
+                  "Receding_Hairline", "Rosy_Cheeks", "Sideburns", "Smiling", 
+                  "Straight_Hair", "Wavy_Hair", "Wearing_Earrings", 
+                  "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", 
+                  "Wearing_Necktie", "Young"] # 40
     attrs_default = [
     'Bald', 'Bangs', 'Black_Hair', 'Blond_Hair', 'Brown_Hair', 'Bushy_Eyebrows',
     'Eyeglasses', 'Male', 'Mouth_Slightly_Open', 'Mustache', 'No_Beard', 'Pale_Skin', 'Young'
@@ -187,7 +208,7 @@ if __name__=="__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     PLL = PerceptualLoss()
-    model_e_d = LSA_VAE(img_size)
+    model_e_d = LSA_VAE(8, len(attrs_list))
     
     
     from data import CelebA
