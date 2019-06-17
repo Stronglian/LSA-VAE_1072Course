@@ -60,11 +60,14 @@ class LSA_VAE(nn.Module):
             nn.Conv2d(3, d // 2, kernel_size=4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(d // 2),
             nn.ReLU(inplace=True),
+            
             nn.Conv2d(d // 2, d, kernel_size=4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(d),
             nn.ReLU(inplace=True),
+            
             ResBlock(d, d, bn=True),
             nn.BatchNorm2d(d),
+            
             ResBlock(d, d, bn=True),
         )
         self.decoder = nn.Sequential(
@@ -88,7 +91,8 @@ class LSA_VAE(nn.Module):
         
     def encode(self, x):
         h1 = self.encoder(x)
-        h1 = h1.view(-1, self.d * self.f ** 2)
+#        h1 = h1.view(-1, self.d * self.f ** 2) #
+        h1 = h1.view(h1.size(0), -1) #reshape
         return self.fc11(h1), self.fc12(h1)
 
     def reparameterize(self, mu, logvar):
@@ -125,6 +129,7 @@ class LSA_VAE(nn.Module):
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
         self.kl_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
 #        self.kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        print(logvar.size(), attribute.size())
         self.attr_real_loss = F.cross_entropy(logvar, attribute)
         # Normalise by same number of elements as in reconstruction
 #        self.kl_loss /= batch_size * 3 * 1024
@@ -134,7 +139,7 @@ class LSA_VAE(nn.Module):
     
 
     def latest_losses(self):
-        return {'mse': self.mse, 'kl': self.kl_loss}
+        return {'attr_real_loss': self.attr_real_loss, 'kl_loss': self.kl_loss}
     
     
 def train(model_e_d, opt, train_loader):
