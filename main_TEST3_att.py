@@ -165,6 +165,9 @@ def train(model_e_d, opt, train_loader):
     model_e_d.train()
     for idx, (img, attr) in enumerate(train_loader):
         
+        img = img.cuda() if torch.cuda.is_available() else img
+        attr = attr.cuda() if torch.cuda.is_available() else attr
+        
         opt.zero_grad()
         
         recon_x, mu, logvar = model_e_d(img, attr)
