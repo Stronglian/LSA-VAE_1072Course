@@ -55,7 +55,8 @@ class ResBlock(nn.Module):
 class LSA_VAE(nn.Module):
     def __init__(self, d, att_len, kl_coef=0.1, **kwargs):
         super(LSA_VAE, self).__init__()
-
+        
+        self.att_len = att_len
         self.encoder = nn.Sequential(
             nn.Conv2d(3, d // 2, kernel_size=4, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(d // 2),
@@ -88,9 +89,9 @@ class LSA_VAE(nn.Module):
         self.f = 32
         self.d = d
 #        self.fc11 = nn.Linear(d * self.f ** 2, d * self.f ** 2)
-        self.fc11 = nn.Linear(self.f ** 2 * self.d, att_len)
+        self.fc11 = nn.Linear(self.f ** 2 * self.d, self.att_len)
 #        self.fc12 = nn.Linear(d * self.f ** 2, d * self.f ** 2)
-        self.fc12 = nn.Linear(self.f ** 2 * self.d, att_len)
+        self.fc12 = nn.Linear(self.f ** 2 * self.d, self.att_len)
         self.kl_coef = kl_coef
         self.kl_loss = 0
         self.mse = 0
@@ -115,13 +116,14 @@ class LSA_VAE(nn.Module):
 
     def decode(self, z):
 #        z = z.view(-1, self.d, self.f, self.f)
-        z = z.view(self.tmp_h1_size[0], self.tmp_h1_size[1], self.tmp_h1_size[2], -1)
+        z = z.view()##########################################################
         h3 = self.decoder(z)
         return F.tanh(h3)
 
     def forward(self, x):
         mu, logvar = self.encode(x)
         z = self.reparameterize(mu, logvar)
+        print(z.size())
         return self.decode(z), mu, logvar
 
     def sample(self, size):
@@ -157,8 +159,8 @@ def train(model_e_d, opt, train_loader):
     model_e_d.train()
     for idx, (img, attr) in enumerate(train_loader):
         
-        img = img.cuda() if torch.cuda.is_available() else img
-        attr = attr.cuda() if torch.cuda.is_available() else attr
+#        img = img.cuda() if torch.cuda.is_available() else img
+#        attr = attr.cuda() if torch.cuda.is_available() else attr
         
         opt.zero_grad()
         
