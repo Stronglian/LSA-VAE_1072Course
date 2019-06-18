@@ -24,7 +24,7 @@ class PerceptualLoss():
     def contentFunc(self):
 #		conv_3_3_layer = 14
         cnn = models.vgg19(pretrained=True).features
-        cnn = cnn.cuda()
+        cnn = cnn.cuda() if torch.cuda.is_available() else cnn
         model = nn.Sequential()
         model = model.cuda()
 #		for i,layer in enumerate(list(cnn)):
@@ -113,7 +113,8 @@ class LSA_VAE(nn.Module):
         h1 = h1.view(-1, self.d * self.f ** 2) #reshape
 #        h1 = h1.view(h1.size(0), -1) #reshape
 #        print("h1.size():", h1.size())
-        return self.fc11(h1), self.fc12(h1) #mu, logvar
+#        h1 = F.sigmoid(h1) # 壓制到 0~1
+        return F.tanh(self.fc11(h1)), F.sigmoid(self.fc12(h1)) #mu, logvar
 
     def reparameterize(self, mu, logvar):
         if self.training:
@@ -146,17 +147,17 @@ class LSA_VAE(nn.Module):
 #        self.mse = F.mse_loss(recon_x, x)
         batch_size = x.size(0)
         
-        self.attr_real_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], attribute)
-        self.kl_real_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
+        self.attr_real_loss = F.binary_cross_entropy(logvar[:, :self.att_len], attribute)
+#        self.kl_real_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
 
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
         # https://arxiv.org/abs/1312.6114
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-        self.kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        self.kl_real_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 #        print("size:", logvar.size(), attribute.size())
         # Normalise by same number of elements as in reconstruction
-        self.kl_loss /= batch_size * 3 * 1024
+        self.kl_real_loss /= batch_size * 3 * 1024
 
         # return mse
         return self.attr_real_loss, self.kl_real_loss
@@ -260,6 +261,8 @@ if __name__=="__main__":
     hyper_gamma = 1
     hyper_m = 1
     
+    learningRate = 0.0005
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     PLL = PerceptualLoss(nn.MSELoss())
@@ -281,7 +284,9 @@ if __name__=="__main__":
         )
     
 #    SGD_optimizer = optim.SGD(model_e_d.parameters(), lr=0.0005, momentum=0.5, weight_decay=1e-4)
-    ADAM_optimizer = optim.Adam(model_e_d.parameters(), lr=0.0005, betas = (0.5, 0.99))
+    ADAM_optimizer = optim.Adam(model_e_d.parameters(), lr=learningRate, betas = (0.5, 0.99))
+    
+    
     
     train(model_e_d, ADAM_optimizer, train_dataloader)
     
