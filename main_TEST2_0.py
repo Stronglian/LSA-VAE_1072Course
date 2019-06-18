@@ -114,7 +114,7 @@ class LSA_VAE(nn.Module):
 #        h1 = h1.view(h1.size(0), -1) #reshape
 #        print("h1.size():", h1.size())
 #        h1 = F.sigmoid(h1) # 壓制到 0~1
-        return F.tanh(self.fc11(h1)), F.sigmoid(self.fc12(h1)) #mu, logvar
+        return torch.tanh(self.fc11(h1)), torch.sigmoid(self.fc12(h1)) #mu, logvar
 
     def reparameterize(self, mu, logvar):
         if self.training:
@@ -230,7 +230,7 @@ def test():
     
     
     return
-
+ 
 if __name__=="__main__":
     
     attr_path = "data/list_attr_celeba.txt"
@@ -251,15 +251,17 @@ if __name__=="__main__":
     attrs_default = ['Bald', 'Bangs', 'Black_Hair', 'Blond_Hair', 'Brown_Hair',
                      'Bushy_Eyebrows', 'Eyeglasses', 'Male', 
                      'Mouth_Slightly_Open', 'Mustache', 'No_Beard', 
-                     'Pale_Skin', 'Young']
-    attrs_list = attrs_default.copy()
+                     'Pale_Skin', 'Young'] #13
+    attrs_four = [ 'Eyeglasses', 'Male', 
+                     'Mouth_Slightly_Open', 'Pale_Skin', 'Young'] #4
+    attrs_list = attrs_four.copy()
     batch_size = 32
     n_samples = 16
     
     hyper_alpha = 1
-    hyper_beta = 1
+    hyper_beta  = 0.1
     hyper_gamma = 1
-    hyper_m = 1
+    hyper_m     = 1
     
     learningRate = 0.0005
     
