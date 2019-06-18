@@ -144,18 +144,19 @@ class LSA_VAE(nn.Module):
 
     def loss_function(self, x, recon_x, attribute, mu, logvar):
 #        self.mse = F.mse_loss(recon_x, x)
-#        batch_size = x.size(0)
+        batch_size = x.size(0)
+        
+        self.attr_real_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], attribute)
+        self.kl_real_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
 
         # see Appendix B from VAE paper:
         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
         # https://arxiv.org/abs/1312.6114
         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-        self.kl_real_loss = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
-#        self.kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+        self.kl_loss = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
 #        print("size:", logvar.size(), attribute.size())
-        self.attr_real_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], attribute)
         # Normalise by same number of elements as in reconstruction
-#        self.kl_loss /= batch_size * 3 * 1024
+        self.kl_loss /= batch_size * 3 * 1024
 
         # return mse
         return self.attr_real_loss, self.kl_real_loss
@@ -181,7 +182,7 @@ class LSA_VAE(nn.Module):
 #    def train_Dec(self):
 #        """ 要訓練的 sita 在哪?"""
 #        
-#        attr_fake_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], a_ti)
+#        attr_fake_loss = -F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], a_ti)
 #        kl_fake_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
 #        
 #        dec_loss = kl_fake_loss + attr_fake_loss
