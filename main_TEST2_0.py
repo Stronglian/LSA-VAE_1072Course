@@ -262,6 +262,7 @@ if __name__=="__main__":
     hyper_beta  = 0.1
     hyper_gamma = 1
     hyper_m     = 1
+    epochs=10
     
     learningRate = 0.0005
     
@@ -289,36 +290,10 @@ if __name__=="__main__":
     ADAM_optimizer = optim.Adam(model_e_d.parameters(), lr=learningRate, betas = (0.5, 0.99))
     
     
+    # fit
+    for _epoch in range(epochs):
+        
+        train(model_e_d, ADAM_optimizer, train_dataloader)
+        
+        test()
     
-    train(model_e_d, ADAM_optimizer, train_dataloader)
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-#    main()
