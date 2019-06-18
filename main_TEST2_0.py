@@ -129,13 +129,28 @@ class LSA_VAE(nn.Module):
         z = z.view(-1, self.d, self.f, self.f)
 #        z = z.view(-1, 8, 4, self.att_len)
         h3 = self.decoder(z)
-        return F.tanh(h3) # should be like [32, 3, 128, 128]
+        return torch.tanh(h3) # should be like [32, 3, 128, 128]
 
-    def forward(self, x):
-        mu, logvar = self.encode(x)
-        z = self.reparameterize(mu, logvar)
-#        print("z.size():", z.size())
-        return self.decode(z), mu, logvar
+    def forward(self, x, mu=None, logvar=None, mode="enc-dec"):
+        if mode == "enc-dec":
+            mu, logvar = self.encode(x)
+            z = self.reparameterize(mu, logvar)
+    #        print("z.size():", z.size())
+            return self.decode(z), mu, logvar
+        elif mode == "enc":
+            mu, logvar = self.encode(x)
+            return mu, logvar
+        elif mode == "dec":
+            assert not((mu is None) or (logvar is None)), "decoder mode need (mu, logvar)"
+            self.reparameterize(mu, logvar)
+            return self.decode(z)
+        elif mode == "dec-enc":
+            assert not((mu is None) or (logvar is None)), "dec-enc mode need (mu, logvar)"
+            z = self.reparameterize(mu, logvar)
+            x_ti = self.decode(z)
+            mu_ti, logvar_ti = self.encode(x_ti)
+            return x_ti, mu_ti, logvar_ti
+        raise NameError("No mode", mode)
 
 #    def sample(self, size):
 #        sample = Variable(torch.randn(size, self.d * self.f ** 2), requires_grad=False)
@@ -167,31 +182,38 @@ class LSA_VAE(nn.Module):
 #        return {'attr_real_loss': self.attr_real_loss, 'kl_real_loss': self.kl_real_loss}
     
     
-#    def train_Enc(self):
-#        """ 要訓練的 phi、psi 在哪?"""
-##        for p in self.encoder.parameters():
-##            p.requires_grad = True
-#        
-#        attr_real_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], attribute)
-#        kl_real_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
-#        kl_fake_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
-#        
-#        enc_loss = attr_real_loss + kl_real_loss + np.max(0, hyper_m - kl_fake_loss)
-#        
-#        return enc_loss
-#    
-#    def train_Dec(self):
-#        """ 要訓練的 sita 在哪?"""
-#        
-#        attr_fake_loss = -F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], a_ti)
-#        kl_fake_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
-#        
-#        dec_loss = kl_fake_loss + attr_fake_loss
-#        
-#        return dec_loss
+    def train_Enc(self, mu, logvar, attribute, mu_ti, logvar_ti):
+        """ 要訓練的 phi、psi 在哪?"""
+#        for p in self.encoder.parameters():
+#            p.requires_grad = True
+        
+        attr_real_loss = F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], attribute)
+        # 不確定哪種算法
+        kl_real_loss   = F.kl_div(mu_ti, torch.Tensor(np.random.normal(0, 1, mu_ti.size())))
+        
+        kl_fake_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
+        
+        enc_loss = attr_real_loss + kl_real_loss + max(0, hyper_m - kl_fake_loss)
+        
+        return enc_loss
+    
+    def train_Dec(self, mu, logvar, logvar_ti):
+        """ 要訓練的 sita 在哪?"""
+        
+        attr_fake_loss = -F.binary_cross_entropy_with_logits(logvar[:, :self.att_len], \
+                                                             logvar_ti[:, :self.att_len])
+        
+        kl_fake_loss   = F.kl_div(mu, torch.Tensor(np.random.normal(0, 1, mu.size())))
+        
+        dec_loss = kl_fake_loss + attr_fake_loss
+        
+        return dec_loss
     
     
 def train(model_e_d, opt, train_loader):
+    final_loss = None
+    TF_fiestBatch = True
+    
     model_e_d.train()
 #    lowestLOSS = 1
     for idx, (img, attr) in enumerate(train_loader):
@@ -213,18 +235,37 @@ def train(model_e_d, opt, train_loader):
         
         ir_loss = hyper_alpha*attr_real_loss - hyper_beta*kl_real_loss + hyper_gamma*rec_loss
         
-        ir_loss.backward()
-        opt.step()
-        
-        print("Train :idx:%10d"%(idx))
-        print("ir_loss:", ir_loss.item(),      ", attr_real_loss:", attr_real_loss.item(), \
-              ", kl_loss:", kl_real_loss.item(), ", rec_loss:", rec_loss.item())
+#        ir_loss.backward()
+#        opt.step()
         
         # Adversarial training
         
+        x_ti, mu_ti, logvar_ti = model_e_d(recon_x, mu, logvar, mode = "dec-enc")
+        
+        enc_loss = model_e_d.train_Enc(mu, logvar, attr, mu_ti, logvar_ti)
+        
+        dec_loss = model_e_d.train_Dec(mu, logvar, logvar_ti)
+        
+        total_loss = ir_loss + hyper_lamda*enc_loss + hyper_lamda*dec_loss
+        
+        total_loss.backward()
+        opt.step()
+        
+        print("Train :idx:%10d"%(idx))
+        print("total_loss:", total_loss.item(),"ir_loss:", ir_loss.item(),\
+              ", attr_real_loss:", attr_real_loss.item(), \
+              ", kl_loss:", kl_real_loss.item(), ", rec_loss:", rec_loss.item(), \
+              ", enc_loss:", enc_loss.item(), ", dec_loss:", dec_loss.item())
+        
+        if TF_fiestBatch :
+            TF_fiestBatch = False
+            final_loss = total_loss
+        elif final_loss > total_loss:
+            final_loss = total_loss
+            #並記錄權重
         
     
-    return
+    return final_loss
     
 def test():
     
@@ -262,6 +303,8 @@ if __name__=="__main__":
     hyper_beta  = 0.1
     hyper_gamma = 1
     hyper_m     = 1
+    hyper_lamda = 0.5
+    
     epochs=10
     
     learningRate = 0.0005
